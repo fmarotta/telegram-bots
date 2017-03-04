@@ -5,22 +5,25 @@ to a Telegram user through a bot. It is supposed to run continuously.
 
 """
 
-# Again I hard coded some things, be careful
-
 import telepot
 import feedparser
+import sys
 import time
 import calendar
 from bs4 import BeautifulSoup
 
+if len(sys.argv) != 3:
+    print('Usage: python rss.py <bot\'s token> <your Telegram ID>')
+    sys.exit()
+
 # Initialize the bot
-bot = telepot.Bot(#INSERT TOKEN#)
-my_id = #INSERT ID#
+token = sys.argv[1]
+my_id = sys.argv[2]
+bot = telepot.Bot(token)
 
 # Define the feeds you want to "subscribe" to
 # FIXME: read them from a file, or better yet let the user tell the bot
 # which feeds he wants to read
-# Otherwise change directly the code
 feeds = [
     'https://www.debian.org/News/news',
     'https://www.archlinux.org/feeds/news/',
@@ -37,7 +40,7 @@ def parse_feed(feed):
     msg = []
     global last_parsed_time
 
-    # Save the time BEFORE the feed is parsed
+    # Save the time JUST BEFORE the feed is parsed
     parsed_time = time.time()
     # Parse the feed
     d = feedparser.parse(feed)
