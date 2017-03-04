@@ -1,31 +1,38 @@
 /*
- *  This program implements a bot such that every message the user
- *  sends it is interpreted as a shell command and is executed in a
- *  pseudoterminal.
+ *  This program implements a pseudoterminal one can interact with through
+ *  a Telegram bot.
  */
- 
-// Forgive my laziness but I hard coded my Telegram ID and the bot's token
-// If you want to use this code, insert your parameters where indicated
 
+// Import the modules
+// NOTE: pty module requires python2, make and gcc
 const Telegraf = require('/usr/lib/node_modules/telegraf')
 const Pty = require('/usr/lib/node_modules/pty')
 const Fs = require('fs')
 const Https = require('https')
 
-const my_id = // Insert telegram user ID here
-const token = // Insert token here
+// Check if the number of arguments is right
+if (process.argv.length != 4) {
+    console.log('Pass me the bot\'s token and your Telegram ID as arguments')
+    return
+}
+
+// Start the bot
+const token = process.argv[2]
+const my_id = parseInt(process.argv[3])
 const bot = new Telegraf(token)
 
+// Initialize the pty variable to take a track of wether a command is
+// running or not
 var pty = 0
 
-bot.on(['message', 'edited_message', 'callback_query', 'inline_query', 'chosen_inline_result', 'channel_post', 'edited_channel_post'], (ctx, next) => {
+// Check the user's identity
+bot.on(['message', 'edited_message', 'inline_query', 'channel_post', 'edited_channel_post'], (ctx, next) => {
 
-    // Define some useful variables for siplicity's sake
+    // Define some useful variables for simplicity's sake
     username = ctx.message.from.username
     id = ctx.message.from.id
     text = ctx.message.text
 
-    // Check the identity of the sender
     if (id != my_id) {
 
         // Send a message to the sender
@@ -33,7 +40,7 @@ bot.on(['message', 'edited_message', 'callback_query', 'inline_query', 'chosen_i
             'This incident will be reported.'
         )
 
-        // And a message to me
+        // And a message to the bot's master
         ctx.telegram.sendMessage(my_id, 'Bot violation\n' + 
             'User "' + username + '" ' +
             '(' + id + ')\n' +
@@ -44,6 +51,7 @@ bot.on(['message', 'edited_message', 'callback_query', 'inline_query', 'chosen_i
 
     }
         
+    // Call next middleware
     next()
 
 })
@@ -154,12 +162,14 @@ bot.command('download', (ctx, next) => {
 
             }
 
-            ctx.reply('File sent')
+            ctx.reply('File in the hole!')
 
         }catch (err) {
 
             ctx.reply(err)
-            
+
+            console.log('Error while sending file.')
+
             return
 
         }
@@ -295,4 +305,3 @@ function getEnv() {
     return env
 
 }
-
