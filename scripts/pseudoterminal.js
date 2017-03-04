@@ -13,7 +13,7 @@ const Https = require('https')
 // Check if the number of arguments is right
 if (process.argv.length != 4) {
     console.log('Pass me the bot\'s token and your Telegram ID as arguments')
-    return
+    process.exit()
 }
 
 // Start the bot
