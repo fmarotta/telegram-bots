@@ -24,6 +24,7 @@ bot = telepot.Bot(token)
 # Define the feeds you want to "subscribe" to
 # FIXME: read them from a file, or better yet let the user tell the bot
 # which feeds he wants to read
+# Otherwise edit the following lines
 feeds = [
     'https://www.debian.org/News/news',
     'https://www.archlinux.org/feeds/news/',
