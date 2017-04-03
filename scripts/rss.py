@@ -24,16 +24,18 @@ bot = telepot.Bot(token)
 # Define the feeds you want to "subscribe" to
 # FIXME: read them from a file, or better yet let the user tell the bot
 # which feeds he wants to read
-# Otherwise edit the following lines
 feeds = [
     'https://www.debian.org/News/news',
     'https://www.archlinux.org/feeds/news/',
+    'http://www.lescienze.it/rss/all/rss2.0.xml',
 ]
 
 # The first time the program is executed, set last_parsed_time to the
 # current time
-# Feature: let the user choose the time after which retrieve the posts
-last_parsed_time = time.time()
+# Feature: let the user choose the time after which the posts are retrieved
+last_parsed_time = []
+for feed in feeds:
+    last_parsed_time.insert(feeds.index(feed), time.time())
 
 # Define the feed parser
 def parse_feed(feed):
@@ -46,11 +48,8 @@ def parse_feed(feed):
     # Parse the feed
     d = feedparser.parse(feed)
     for entry in d.entries:
-        # Check if we have already seen this update
-        if calendar.timegm(entry.updated_parsed) < last_parsed_time:
-            continue
-        # Otherwise send a message to the user
-        else:
+        # Check if we haven't already seen this update
+        if calendar.timegm(entry.updated_parsed) >= last_parsed_time[feeds.index(feed)]:
             if 'title' in d.feed:
                 feed_title = d.feed.title
             else:
@@ -70,10 +69,10 @@ def parse_feed(feed):
             else:
                 entry_link = 'No link for this entry'
 
-        msg.insert(0, '*Feed update!\n{}*\n\n_{}_\n\n{}\n\nLink:\n{}'.format(feed_title, entry_title, entry_description, entry_link))
+            msg.insert(0, '*Feed update!\n{}*\n\n_{}_\n\n{}\n\nLink:\n{}'.format(feed_title, entry_title, entry_description, entry_link))
 
     # Update last_parsed_time with the time of the parsing
-    last_parsed_time = parsed_time
+    last_parsed_time[feeds.index(feed)] = parsed_time
 
     return msg
 
@@ -87,4 +86,3 @@ while 1:
                 bot.sendMessage(my_id, 'There is a feed update from {}, but I cannot send it to you because of a Telegram error'.format(feed))
     # Check for updates every 61 minutes
     time.sleep(61 * 60)
-
