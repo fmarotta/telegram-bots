@@ -36,7 +36,7 @@ class ImapAccount:
 # Feature: let the bot ask the user for new accounts
 accounts = []
 
-accounts.append(ImapAccount('<yourmailserver', 993, '<yourusername>', '<yourpassword>', ['inbox']))
+accounts.append(ImapAccount('<yourmailserver>', 993, '<yourusername>', '<yourpassword>', ['inbox']))
 # By using this format you can append how many accounts as you want.
 
 # The function which fetch the messages
@@ -82,7 +82,7 @@ def fetch_email(account):
                 return
 
             # Parse the message
-            message = email.message_from_string(data[0][1].decode(encoding='utf-8'))
+            message = email.message_from_string(data[0][1].decode(encoding='utf-8', errors='ignore'))
 
             # Save some header information
             # Feature: recognize replies and Cc
@@ -112,12 +112,13 @@ def fetch_email(account):
             # NOTE: we do not use the method get_body; we use
             # walk instead, because we think it is safer
             if not message.is_multipart():
-                payload = message.get_payload(decode=True).decode('utf-8')
+                charset = message.get_content_charset()
+                payload = message.get_payload(decode=True).decode(encoding = charset, errors = 'ignore')
             else:
                 for part in message.walk():
                     charset = part.get_content_charset()
                     if part.get_content_type() == 'text/plain':
-                        payload += part.get_payload(decode=True).decode(charset) + '\n'
+                        payload += part.get_payload(decode=True).decode(encoding = charset, errors = 'ignore') + '\n'
                     # If there is an attachment, inform the user
                     if not part.get_content_maintype() in ['text', 'multipart', 'message']:
                         attachments += part.get_content_type() + '\n'
