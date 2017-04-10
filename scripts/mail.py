@@ -36,10 +36,11 @@ class ImapAccount:
 # Feature: let the bot ask the user for new accounts
 accounts = []
 
+# Feature: store the account information in a separate file, possibly encrypted
+# By using the following format you can append how many accounts as you want
 accounts.append(ImapAccount('<yourmailserver>', 993, '<yourusername>', '<yourpassword>', ['inbox']))
-# By using this format you can append how many accounts as you want.
 
-# The function which fetch the messages
+# The function which fetches the messages
 def fetch_email(account):
     msg = []
     # Create a ssl context for the connection to the imap server
@@ -76,7 +77,7 @@ def fetch_email(account):
             payload = ''
             attachments = ''
             # Fetch the unread emails
-            result, data = mail.uid('fetch', uid, '(RFC822)') # By fetching the whole RFC 822 message, it becomes automatically read
+            result, data = mail.uid('fetch', uid, '(RFC822)') # By fetching the message following RFC 822, it becomes automatically read
             if result != 'OK':
                 bot.sendMessage(my_id, 'Error while fetching new e-mails from ' + account.username + '\n: ' + result)
                 return
@@ -131,6 +132,13 @@ def fetch_email(account):
             soup = BeautifulSoup(payload, 'html5lib')
             payload = soup.get_text()
 
+            # Replace `<' and `>' characters, because they confuse the
+            # Telegram API
+            # The replacement characters are, respectively, the
+            # less-than-or-equal-to and the greater-than-or-equal-to signs
+            payload = payload.replace('<', '≤')
+            payload = payload.replace('>', '≥')
+
             # Instead of letting this field blank, tell 'None'
             if attachments == '':
                 attachments = 'None'
@@ -151,6 +159,13 @@ while 1:
             try:
                 bot.sendMessage(my_id, mex, 'HTML')
             except telepot.exception.TelegramError as err:
-                bot.sendMessage(my_id, 'You\'ve got new mails to {}, but I could\'t send them because of a Telegram error {}'.format(account.username, err))
+                if (err.description == 'Bad Request: message is too long'):
+                    # Split the long message in chunks (max lenght for the API
+                    # is 4096 bytes)
+                    chunks = [mex[i:i+4000] for i in range(0, len(mex), 4000)] # I brutally copied this line from http://stackoverflow.com/questions/9475241/split-python-string-every-nth-character
+                    for chunk in chunks:
+                        bot.sendMessage(my_id, chunk, 'HTML')
+                else:
+                    bot.sendMessage(my_id, 'You\'ve got new mails to {}, but I could\'t send them because of a Telegram error {}'.format(account.username, err))
     # Execute this every 14 minutes
     time.sleep(14 * 60)
