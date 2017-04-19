@@ -25,10 +25,11 @@ bot = telepot.Bot(token)
 # FIXME: read them from a file, or better yet let the user tell the bot
 # which feeds he wants to read
 feeds = [
+    'http://www.lescienze.it/rss/all/rss2.0.xml',
     'https://www.debian.org/News/news',
     'https://www.archlinux.org/feeds/news/',
-    'http://www.lescienze.it/rss/all/rss2.0.xml',
 ]
+
 
 # The first time the program is executed, set last_parsed_time to the
 # current time
@@ -45,8 +46,13 @@ def parse_feed(feed):
 
     # Save the time JUST BEFORE the feed is parsed
     parsed_time = time.time()
-    # Parse the feed
+    # Parse the feed and return if there are errors
     d = feedparser.parse(feed)
+    if d.status != 200:
+        return [] # This prevents updating last_parsed_time, which stays as it was the last time the feed was parsed without errors
+    if d.bozo:
+        bot.sendMessage(my_id, 'A parsing error occurred while parsing the feed {}.'.format(feed)) # Do not return: perhaps the error is not fatal. Besides, the error will persist as long as the faulty post stays in the feed
+
     for entry in d.entries:
         # Check if we haven't already seen this update
         if calendar.timegm(entry.updated_parsed) >= last_parsed_time[feeds.index(feed)]:
@@ -69,7 +75,7 @@ def parse_feed(feed):
             else:
                 entry_link = 'No link for this entry'
 
-            msg.insert(0, '*Feed update!\n{}*\n\n_{}_\n\n{}\n\nLink:\n{}'.format(feed_title, entry_title, entry_description, entry_link))
+            msg.insert(0, '<b>Feed update!\n{}</b>\n\n<i>{}</i>\n\n{}\n\nLink:\n{}'.format(feed_title, entry_title, entry_description, entry_link))
 
     # Update last_parsed_time with the time of the parsing
     last_parsed_time[feeds.index(feed)] = parsed_time
@@ -81,8 +87,8 @@ while 1:
         msg = parse_feed(feed)
         for mex in msg:
             try:
-                bot.sendMessage(my_id, mex, 'Markdown')
-            except telepot.exception.TelegramError:
-                bot.sendMessage(my_id, 'There is a feed update from {}, but I cannot send it to you because of a Telegram error'.format(feed))
+                bot.sendMessage(my_id, mex, 'HTML')
+            except telepot.exception.TelegramError as err:
+                bot.sendMessage(my_id, 'There is a feed update from {}, but I cannot send it to you because of a Telegram error: {}'.format(feed, err))
     # Check for updates every 61 minutes
     time.sleep(61 * 60)
