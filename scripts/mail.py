@@ -38,8 +38,8 @@ class ImapAccount:
 # Feature: let the bot ask the user for new accounts
 # NOTE: create a file named `mail_accounts' (without quotes) in a directory
 # called `config' (without quotes); the directory should be in the same
-# directory as this script. Fill the mail_accounts file with the information
-# about your imap account with the following format:
+# directory parent of this script. Fill the mail_accounts file with the
+# information about your imap account with the following format:
 # mailserver    port    username    password    folder,folder
 # the values are tab-delimited. If you have more than one account, add other
 # lines. A description of the fields follows:
