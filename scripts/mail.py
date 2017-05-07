@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 """
 
 This program connects to an imap account, fetches the unread emails
@@ -25,20 +27,37 @@ bot = telepot.Bot(token)
 
 # Define the mail account class
 class ImapAccount:
-    def __init__(self, host, port, username, password, folders):
-        self.host = host
-        self.port = port
-        self.username = username
-        self.password = password
-        self.folders = folders
+    def __init__(self, imap_params):
+        self.host = imap_params[0]
+        self.port = imap_params[1]
+        self.username = imap_params[2]
+        self.password = imap_params[3]
+        self.folders = imap_params[4].split(",")
 
 # Define the accounts
 # Feature: let the bot ask the user for new accounts
+# NOTE: create a file named `mail_accounts' (without quotes) in a directory
+# called `config' (without quotes); the directory should be in the same
+# directory as this script. Fill the mail_accounts file with the information
+# about your imap account with the following format:
+# mailserver    port    username    password    folder,folder
+# the values are tab-delimited. If you have more than one account, add other
+# lines. A description of the fields follows:
+# mailserver is the server which provides you the email service;
+# port is the port through which the server is accessed;
+# username is your account's username;
+# password is your account's password (in clear);
+# folder is one of the folders you want to read, tipically it is inbox. If you want to add more, separe them with a comma.
+# Note that these are the same information that you have to enter in order to
+# configure any mail client.
+# Example:
+# imap.gmail.com    993 john@gmail.com  qwerty123   inbox,spam
 accounts = []
-
-# Feature: store the account information in a separate file, possibly encrypted
-# By using the following format you can append how many accounts as you want
-accounts.append(ImapAccount('<yourmailserver>', 993, '<yourusername>', '<yourpassword>', ['inbox']))
+with open('../config/mail_accounts') as mail_accounts:
+    lines = mail_accounts.readlines()
+    for imap_params in lines:
+        imap_params = imap_params.rstrip("\n")
+        accounts.append(ImapAccount(imap_params.split("\t")))
 
 # The function which fetches the messages
 def fetch_email(account):
@@ -53,7 +72,7 @@ def fetch_email(account):
     if result != 'OK':
         bot.sendMessage(my_id, 'Error while logging in to ' + account.username + ': ' + result)
         return
-    
+
     # Select the folders to search for messages
     for folder in account.folders:
         # Select the specified folder
@@ -166,6 +185,7 @@ while 1:
                     for chunk in chunks:
                         bot.sendMessage(my_id, chunk, 'HTML')
                 else:
-                    bot.sendMessage(my_id, 'You\'ve got new mails to {}, but I could\'t send them because of a Telegram error {}'.format(account.username, err))
+                    bot.sendMessage(my_id, 'You\'ve got new mails to {}, but I could\'t send them because of a Telegram error: {}'.format(account.username, err))
     # Execute this every 14 minutes
     time.sleep(14 * 60)
+

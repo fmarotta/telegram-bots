@@ -1,10 +1,13 @@
+#!/usr/bin/node
+
 /*
  *  This program implements a pseudoterminal one can interact with through
  *  a Telegram bot.
  */
 
 // Import the modules
-// NOTE: pty module requires python2, make and gcc
+// NOTE: pty module requires python2, make and gcc for installation (then
+// you can uninstall at least python2)
 const Telegraf = require('/usr/lib/node_modules/telegraf')
 const Pty = require('/usr/lib/node_modules/pty')
 const Fs = require('fs')
@@ -168,8 +171,6 @@ bot.command('download', (ctx, next) => {
 
             ctx.reply(err)
 
-            console.log('Error while sending file.')
-
             return
 
         }
@@ -194,6 +195,12 @@ bot.on('text', (ctx, next) => {
 
             var dir = text.split(' ')[1]
 
+            if (dir == '' || dir == '~') {
+
+                dir = process.env.HOME
+
+            }
+
             try {
 
                 process.chdir(dir)
@@ -212,16 +219,29 @@ bot.on('text', (ctx, next) => {
 
         }
 
+        // Running bash causes the program to break very badly
+        if (text.match(/^bash/)) {
+
+            ctx.reply('Cannot start another bash process')
+
+            return
+
+        }
+
         // Spawn a new pty
-        pty = Pty.spawn('/bin/sh', ['-c', text], {
+        pty = Pty.spawn('/bin/bash', ['-c', text], {
+            //name: 'xterm', // If you want to use xterm, you have to manage control sequences... see http://wiki.bash-hackers.org/scripting/terminalcodes
             name: 'dumb',
-            cols: 40,
-            rows: 20,
-            cwd: process.cwd() || process.env.HOME,
+            cols: 80,
+            rows: 25,
+            cwd: process.env.HOME,
             env: getEnv(),
         })
     
         // Process the output
+        // FIXME: sometimes messages are fragmented and sent in the wrong order.
+        // Maybe add some kind of buffer? However, for interactive commands that
+        // would be a problem.
         pty.on('data', function(data) {
 
             // FIXME: add a promise rejection handler

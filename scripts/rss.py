@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 """
 
 Parses the given feed, and if there is a new post it sends the content
@@ -30,7 +32,6 @@ feeds = [
     'https://www.archlinux.org/feeds/news/',
 ]
 
-
 # The first time the program is executed, set last_parsed_time to the
 # current time
 # Feature: let the user choose the time after which the posts are retrieved
@@ -49,6 +50,7 @@ def parse_feed(feed):
     # Parse the feed and return if there are errors
     d = feedparser.parse(feed)
     if d.status != 200:
+        bot.sendMessage(my_id, 'An http error occurred while parsing the feed {}.'.format(feed))
         return [] # This prevents updating last_parsed_time, which stays as it was the last time the feed was parsed without errors
     if d.bozo:
         bot.sendMessage(my_id, 'A parsing error occurred while parsing the feed {}.'.format(feed)) # Do not return: perhaps the error is not fatal. Besides, the error will persist as long as the faulty post stays in the feed
@@ -92,3 +94,4 @@ while 1:
                 bot.sendMessage(my_id, 'There is a feed update from {}, but I cannot send it to you because of a Telegram error: {}'.format(feed, err))
     # Check for updates every 61 minutes
     time.sleep(61 * 60)
+
