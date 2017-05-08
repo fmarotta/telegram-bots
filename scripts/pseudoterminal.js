@@ -111,6 +111,7 @@ bot.command('kill', (ctx, next) => {
 
 bot.command('download', (ctx, next) => {
 
+    // NOTE: do not worry about shell special characters: do not escape them in the message.
     var args = ctx.message.text.split(' ')
     args.shift()
 
@@ -165,8 +166,6 @@ bot.command('download', (ctx, next) => {
 
             }
 
-            ctx.reply('File in the hole!')
-
         }catch (err) {
 
             ctx.reply(err)
@@ -174,6 +173,8 @@ bot.command('download', (ctx, next) => {
             return
 
         }
+
+        ctx.reply('File in the hole!')
 
     })
 
@@ -195,7 +196,7 @@ bot.on('text', (ctx, next) => {
 
             var dir = text.split(' ')[1]
 
-            if (dir == '' || dir == '~') {
+            if (dir == undefined || dir == '~') {
 
                 dir = process.env.HOME
 
@@ -207,7 +208,7 @@ bot.on('text', (ctx, next) => {
 
             }catch (err) {
 
-                ctx.reply(err)
+                ctx.reply("Unable to change directory: " + err)
             
                 return
 
@@ -234,7 +235,7 @@ bot.on('text', (ctx, next) => {
             name: 'dumb',
             cols: 80,
             rows: 25,
-            cwd: process.env.HOME,
+            cwd: process.cwd() || process.env.HOME, // process.cwd() is better because then you can use relative paths
             env: getEnv(),
         })
     
