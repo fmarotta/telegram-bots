@@ -12,7 +12,7 @@ import feedparser
 import sys
 import time
 import calendar
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup # Install package ``beautifulsoup4'' via pip.
 
 if len(sys.argv) != 3:
     print('Usage: python rss.py <bot\'s token> <your Telegram ID>')

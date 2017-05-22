@@ -7,9 +7,9 @@
 
 // Import the modules
 // NOTE: pty module requires python2, make and gcc for installation (then
-// you can uninstall at least python2)
+// you can uninstall at least python2). It also requires the node module nan.
 const Telegraf = require('/usr/lib/node_modules/telegraf')
-const Pty = require('/usr/lib/node_modules/pty')
+const Pty = require('/usr/lib/node_modules/node-pty')
 const Fs = require('fs')
 const Https = require('https')
 
@@ -230,11 +230,24 @@ bot.on('text', (ctx, next) => {
         }
 
         // Spawn a new pty
+        // Available pty types:
+        // amiga
+        // beos-ansi
+        // ansi
+        // pcansi
+        // win32
+        // vt320
+        // vt52
+        // xterm
+        // iris-ansi
+        // debug
+        // dumb
         pty = Pty.spawn('/bin/bash', ['-c', text], {
             //name: 'xterm', // If you want to use xterm, you have to manage control sequences... see http://wiki.bash-hackers.org/scripting/terminalcodes
+            //name: 'vt52', // This tty uses 24 characters for colors. Nice!
             name: 'dumb',
             cols: 80,
-            rows: 25,
+            rows: 100,
             cwd: process.cwd() || process.env.HOME, // process.cwd() is better because then you can use relative paths
             env: getEnv(),
         })
