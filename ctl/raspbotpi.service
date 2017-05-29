@@ -1,0 +1,7 @@
+[Unit]
+Description=raspbotpi: a Telegram bot to admin the Raspberry Pi
+
+[Service]
+Type=simple
+ExecStart=/home/fmarotta/raspbotpi/scripts/index.sh start
+

@@ -1,0 +1,9 @@
+[Unit]
+Description=Timer for raspbotpi
+
+[Timer]
+OnBootSec=5min
+
+[Install]
+WantedBy=multi-user.target
+
