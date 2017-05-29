@@ -53,7 +53,7 @@ class ImapAccount:
 # Example:
 # imap.gmail.com    993 john@gmail.com  qwerty123   inbox,spam
 accounts = []
-with open('../config/mail_accounts') as mail_accounts:
+with open('/home/fmarotta/raspbotpi/config/mail_accounts') as mail_accounts:
     lines = mail_accounts.readlines()
     for imap_params in lines:
         imap_params = imap_params.rstrip("\n")
