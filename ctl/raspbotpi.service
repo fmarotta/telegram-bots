@@ -1,0 +1,12 @@
+[Unit]
+Description=Start RaspbotPi
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c '/usr/bin/node /home/fmarotta/raspbotpi/scripts/pseudoterminal.js `cat /home/fmarotta/raspbotpi/config/params` &'
+ExecStart=/bin/bash -c '/usr/bin/python /home/fmarotta/raspbotpi/scripts/mail.py `cat /home/fmarotta/raspbotpi/config/params` &'
+ExecStart=/bin/bash -c '/usr/bin/python /home/fmarotta/raspbotpi/scripts/rss.py `cat /home/fmarotta/raspbotpi/config/params` &'
+
+[Install]
+WantedBy=multi-user.target

@@ -9,7 +9,7 @@
 // NOTE: pty module requires python2, make and gcc for installation (then
 // you can uninstall at least python2). It also requires the node module nan.
 const Telegraf = require('/usr/lib/node_modules/telegraf')
-const Pty = require('/usr/lib/node_modules/node-pty')
+const Pty = require('/usr/lib/node_modules/pty')
 const Fs = require('fs')
 const Https = require('https')
 
@@ -23,6 +23,9 @@ if (process.argv.length != 4) {
 const token = process.argv[2]
 const my_id = parseInt(process.argv[3])
 const bot = new Telegraf(token)
+
+// Set the home variable
+const home = '/home/fmarotta/'
 
 // Initialize the pty variable to take a track of wether a command is
 // running or not
@@ -198,7 +201,10 @@ bot.on('text', (ctx, next) => {
 
             if (dir == undefined || dir == '~') {
 
-                dir = process.env.HOME
+                // NOTE: executing the script with systemd doesn't set a
+                // process.env.HOME variable.
+                // dir = process.env.HOME
+                dir = home
 
             }
 
@@ -248,7 +254,7 @@ bot.on('text', (ctx, next) => {
             name: 'dumb',
             cols: 80,
             rows: 100,
-            cwd: process.cwd() || process.env.HOME, // process.cwd() is better because then you can use relative paths
+            cwd: process.cwd() || home, // process.cwd() is better because then you can use relative paths
             env: getEnv(),
         })
     
@@ -335,6 +341,9 @@ function getEnv() {
     // Set $TERM to screen. This disables multiplexers
     // that have login hooks, such as byobu.
     env.TERM = "screen"
+
+    // Set the home directory.
+    env.HOME = home
   
     return env
 
