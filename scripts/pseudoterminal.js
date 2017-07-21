@@ -7,9 +7,11 @@
 
 // Import the modules
 // NOTE: pty module requires python2, make and gcc for installation (then
-// you can uninstall at least python2). It also requires the node module nan.
+// you can uninstall at least python2). It also requires the node module nan. Last time I did this:
+// 1) As root (not sudo) npm install node-pty (without -g)
+// 2) Move the modules in /usr/lib/node_modules
 const Telegraf = require('/usr/lib/node_modules/telegraf')
-const Pty = require('/usr/lib/node_modules/pty')
+const Pty = require('/usr/lib/node_modules/node-pty')
 const Fs = require('fs')
 const Https = require('https')
 
