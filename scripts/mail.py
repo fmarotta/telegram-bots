@@ -53,7 +53,7 @@ class ImapAccount:
 # Example:
 # imap.gmail.com    993 john@gmail.com  qwerty123   inbox,spam
 accounts = []
-with open('/home/fmarotta/raspbotpi/config/mail_accounts') as mail_accounts:
+with open('../config/mail_accounts') as mail_accounts:
     lines = mail_accounts.readlines()
     for imap_params in lines:
         imap_params = imap_params.rstrip("\n")
@@ -63,9 +63,18 @@ with open('/home/fmarotta/raspbotpi/config/mail_accounts') as mail_accounts:
 def fetch_email(account):
     msg = []
     # Create a ssl context for the connection to the imap server
-    context = ssl.create_default_context()
+    try:
+        context = ssl.create_default_context()
+        print(context)
+    except ssl.SSLError as err:
+        print(err);
+
     # Connect to the server
-    mail = imaplib.IMAP4_SSL(host=account.host, port=account.port, ssl_context=context)
+    try:
+        mail = imaplib.IMAP4_SSL(host=account.host, port=account.port, ssl_context=context)
+    except IMAP4.error as err:
+        print('error while connecting to the server for {}.\nError: {}'.format(account, err));
+        return
 
     # Login to the specified account
     result, address = mail.login(account.username, account.password)
