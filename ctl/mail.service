@@ -1,0 +1,6 @@
+[Unit]
+Description=Start RaspbotPi for mail
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python /home/fmarotta/raspbotpi/scripts/mail.py

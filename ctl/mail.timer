@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for RaspbotPi mails
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+
+[Install]
+WantedBy=default.target
+

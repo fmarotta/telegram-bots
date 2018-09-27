@@ -1,0 +1,11 @@
+[Unit]
+Description=Start RaspbotPi for pseudoterminal
+
+[Service]
+Type=simple
+Restart=on-failure
+RemainAfterExit=no
+ExecStart=/usr/bin/node /home/fmarotta/raspbotpi/scripts/pseudoterminal.js
+
+[Install]
+WantedBy=default.target

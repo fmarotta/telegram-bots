@@ -1,0 +1,11 @@
+[Unit]
+Description=Start RaspbotPi for rss
+
+[Service]
+Type=simple
+Restart=on-failure
+RemainAfterExit=no
+ExecStart=/usr/bin/python /home/fmarotta/raspbotpi/scripts/rss.py
+
+[Install]
+WantedBy=default.target
