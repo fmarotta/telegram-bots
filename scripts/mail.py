@@ -7,22 +7,34 @@ and sends the plain text parts to a Telegram user through a bot.
 
 """
 
-import telepot
+# NOTE: telepot version > 7.1 has a problem with urrlib: see
+# https://github.com/nickoala/telepot/issues/87
+# In order for the bot to work properly, you should install telepot 7.0 with
+# `pip install telepot==7.0`
+
 import ssl
 import imaplib
 import email
 import sys
 import time
 from email.header import decode_header
+
+sys.path.insert(0, "/home/fmarotta/raspbotpi/lib/python3.7")
+import telepot
 from bs4 import BeautifulSoup # Install package ``beautifulsoup4'' via pip.
 
-if len(sys.argv) != 3:
-    print('Usage: python mail.py <bot\'s token> <your Telegram ID>')
-    sys.exit()
+#if len(sys.argv) != 3:
+#    print('Usage: python mail.py <bot\'s token> <your Telegram ID>')
+#    sys.exit()
 
 # Initialize the bot
-token = sys.argv[1]
-my_id = sys.argv[2]
+with open('/home/fmarotta/raspbotpi/config/params') as params_file:
+    lines = params_file.readlines()
+    params = lines[0]
+    params = params.rstrip("\n").split("\t")
+
+token = params[0]
+my_id = params[1]
 bot = telepot.Bot(token)
 
 # Define the mail account class
@@ -53,7 +65,7 @@ class ImapAccount:
 # Example:
 # imap.gmail.com    993 john@gmail.com  qwerty123   inbox,spam
 accounts = []
-with open('../config/mail_accounts') as mail_accounts:
+with open('/home/fmarotta/raspbotpi/config/mail_accounts') as mail_accounts:
     lines = mail_accounts.readlines()
     for imap_params in lines:
         imap_params = imap_params.rstrip("\n")
@@ -65,7 +77,6 @@ def fetch_email(account):
     # Create a ssl context for the connection to the imap server
     try:
         context = ssl.create_default_context()
-        print(context)
     except ssl.SSLError as err:
         print(err);
 
@@ -180,21 +191,17 @@ def fetch_email(account):
 
     return msg
 
-while 1:
-    for account in accounts:
-        msg = fetch_email(account)
-        for mex in msg:
-            try:
-                bot.sendMessage(my_id, mex, 'HTML')
-            except telepot.exception.TelegramError as err:
-                if (err.description == 'Bad Request: message is too long'):
-                    # Split the long message in chunks (max lenght for the API
-                    # is 4096 bytes)
-                    chunks = [mex[i:i+4000] for i in range(0, len(mex), 4000)] # I brutally copied this line from http://stackoverflow.com/questions/9475241/split-python-string-every-nth-character
-                    for chunk in chunks:
-                        bot.sendMessage(my_id, chunk, 'HTML')
-                else:
-                    bot.sendMessage(my_id, 'You\'ve got new mails to {}, but I could\'t send them because of a Telegram error: {}'.format(account.username, err))
-    # Execute this every 14 minutes
-    time.sleep(14 * 60)
-
+for account in accounts:
+    msg = fetch_email(account)
+    for mex in msg:
+        try:
+            bot.sendMessage(my_id, mex, 'HTML')
+        except telepot.exception.TelegramError as err:
+            if (err.description == 'Bad Request: message is too long'):
+                # Split the long message in chunks (max lenght for the
+                # API is 4096 bytes)
+                chunks = [mex[i:i+4000] for i in range(0, len(mex), 4000)] # I brutally copied this line from http://stackoverflow.com/questions/9475241/split-python-string-every-nth-character
+                for chunk in chunks:
+                    bot.sendMessage(my_id, chunk, 'HTML')
+            else:
+                bot.sendMessage(my_id, 'You\'ve got new mails to {}, but I could\'t send them because of a Telegram error: {}'.format(account.username, err))
