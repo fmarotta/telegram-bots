@@ -25,6 +25,9 @@ the text part of the email before sending it to me on Telegram. So far, I have t
 I developed this bot mostly because I was tired of compulsively looking for new emails (for example for my exam results...). Now
 I know that if I have a new email, my bot will tell me.
 
+NOTE: if you have a google account, you have to allow access to less 
+secure apps in order for the program to work.
+
 ### rss
 I also was tired of compulsively looking for updates in some RSS feeds. This last (so far) bot connects to an RSS URL, and if there is a new post since the last time the program has checked, it sends me the content of the post.
 
