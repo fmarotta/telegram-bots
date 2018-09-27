@@ -7,80 +7,91 @@ to a Telegram user through a bot. It is supposed to run continuously.
 
 """
 
-import telepot
-import feedparser
 import sys
 import time
 import calendar
-from bs4 import BeautifulSoup # Install package ``beautifulsoup4'' via pip.
 
-if len(sys.argv) != 3:
-    print('Usage: python rss.py <bot\'s token> <your Telegram ID>')
-    sys.exit()
+sys.path.insert(0, "/home/fmarotta/raspbotpi/lib/python3.7")
+import telepot
+from bs4 import BeautifulSoup # Install package ``beautifulsoup4'' via pip.
+import feedparser
+
+#if len(sys.argv) != 3:
+    #print('Usage: python rss.py <bot\'s token> <your Telegram ID>')
+    #sys.exit()
 
 # Initialize the bot
-token = sys.argv[1]
-my_id = sys.argv[2]
+with open('/home/fmarotta/raspbotpi/config/params') as params_file:
+    lines = params_file.readlines()
+    params = lines[0]
+    params = params.rstrip("\n").split("\t")
+
+token = params[0]
+my_id = params[1]
 bot = telepot.Bot(token)
 
-# Define the feeds you want to "subscribe" to
-# FIXME: read them from a file, or better yet let the user tell the bot
-# which feeds he wants to read
+# Define the feeds you want to "subscribe" to FIXME: read them from a
+# file, or better yet let the user tell the bot which feeds he wants to
+# read
 feeds = [
     'http://www.lescienze.it/rss/all/rss2.0.xml',
-    'https://www.debian.org/News/news',
     'https://www.archlinux.org/feeds/news/',
+    'https://superuser.com/feeds/question/1343807',
 ]
+#feeds = [
+#    'http://www.lescienze.it/rss/all/rss2.0.xml',
+#    'https://www.debian.org/News/news',
+#    'https://www.archlinux.org/feeds/news/',
+#]
 
-# The first time the program is executed, set last_parsed_time to the
-# current time
-# Feature: let the user choose the time after which the posts are retrieved
-last_parsed_time = []
+# The first time the program is executed, set last_item to an empty
+# string.
+last_item = []
 for feed in feeds:
-    last_parsed_time.insert(feeds.index(feed), time.time())
+    last_item.insert(feeds.index(feed), '')
 
 # Define the feed parser
 def parse_feed(feed):
     # Variable definitions
     msg = []
-    global last_parsed_time
+    global last_item
 
-    # Save the time JUST BEFORE the feed is parsed
-    parsed_time = time.time()
     # Parse the feed and return if there are errors
     d = feedparser.parse(feed)
     if d.status != 200:
         bot.sendMessage(my_id, 'An http error occurred while parsing the feed {}.'.format(feed))
-        return [] # This prevents updating last_parsed_time, which stays as it was the last time the feed was parsed without errors
+        return [] # This prevents updating last_item, which stays as it was the last time the feed was parsed without errors
     if d.bozo:
         bot.sendMessage(my_id, 'A parsing error occurred while parsing the feed {}.'.format(feed)) # Do not return: perhaps the error is not fatal. Besides, the error will persist as long as the faulty post stays in the feed
 
     for entry in d.entries:
+        if 'title' in d.feed:
+            feed_title = d.feed.title
+        else:
+            feed_title = 'No title for this feed'
+        if 'title' in entry:
+            entry_title = entry.title
+        else:
+            entry_title = 'No title for this entry'
+        if 'description' in entry:
+            entry_description = entry.description
+            soup = BeautifulSoup(entry_description, 'html5lib')
+            entry_description = soup.get_text(' ')
+        else:
+            entry_description = 'No description for this entry'
+        if 'link' in entry:
+            entry_link = entry.link
+        else:
+            entry_link = 'No link for this entry'
+
         # Check if we haven't already seen this update
-        if calendar.timegm(entry.updated_parsed) >= last_parsed_time[feeds.index(feed)]:
-            if 'title' in d.feed:
-                feed_title = d.feed.title
-            else:
-                feed_title = 'No title for this feed'
-            if 'title' in entry:
-                entry_title = entry.title
-            else:
-                entry_title = 'No title for this entry'
-            if 'description' in entry:
-                entry_description = entry.description
-                soup = BeautifulSoup(entry_description, 'html5lib')
-                entry_description = soup.get_text(' ')
-            else:
-                entry_description = 'No description for this entry'
-            if 'link' in entry:
-                entry_link = entry.link
-            else:
-                entry_link = 'No link for this entry'
-
+        if entry_link != last_item[feeds.index(feed)] and last_item[feeds.index(feed)] != '':
             msg.insert(0, '<b>Feed update!\n{}</b>\n\n<i>{}</i>\n\n{}\n\nLink:\n{}'.format(feed_title, entry_title, entry_description, entry_link))
+        else:
+            break
 
-    # Update last_parsed_time with the time of the parsing
-    last_parsed_time[feeds.index(feed)] = parsed_time
+    # Update last_item with the latest item of the feed
+    last_item[feeds.index(feed)] = d.entries[0].link
 
     return msg
 
@@ -92,6 +103,4 @@ while 1:
                 bot.sendMessage(my_id, mex, 'HTML')
             except telepot.exception.TelegramError as err:
                 bot.sendMessage(my_id, 'There is a feed update from {}, but I cannot send it to you because of a Telegram error: {}'.format(feed, err))
-    # Check for updates every 61 minutes
     time.sleep(61 * 60)
-
