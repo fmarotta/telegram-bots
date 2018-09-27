@@ -16,6 +16,7 @@ import ssl
 import imaplib
 import email
 import sys
+import os
 import time
 from email.header import decode_header
 
@@ -112,6 +113,7 @@ def parse_email(mail, uid):
     subject = ''
     payload = ''
     attachments = ''
+    filenames = []
 
     # Fetch unread emails
     result, data = mail.uid('fetch', uid, '(RFC822)') # By fetching the message following RFC 822, it becomes automatically read
@@ -156,7 +158,13 @@ def parse_email(mail, uid):
                 payload += part.get_payload(decode=True).decode(encoding = charset, errors = 'ignore') + '\n'
             # If there is an attachment, inform the user
             if not part.get_content_maintype() in ['text', 'multipart', 'message']:
-                attachments += part.get_content_type() + '\n'
+                filename = part.get_filename()
+                attachments += filename + ': ' + part.get_content_type() + '\n'
+                if bool(filename):
+                    fp = open('/home/fmarotta/raspbotpi/attachments/{}'.format(filename), 'wb')
+                    fp.write(part.get_payload(decode=True))
+                    fp.close()
+                    filenames.insert(0, filename)
 
     # Inform the user if there is no textual payload
     if payload == '':
@@ -167,9 +175,8 @@ def parse_email(mail, uid):
     payload = soup.get_text()
 
     # Replace `<' and `>' characters, because they confuse the Telegram
-    #         API The replacement characters are, respectively, the
-    #         less-than-or-equal-to and the greater-than-or-equal-to
-    #         signs
+    # API The replacement characters are, respectively, the
+    # less-than-or-equal-to and the greater-than-or-equal-to signs
     payload = payload.replace('<', '≤')
     payload = payload.replace('>', '≥')
 
@@ -177,7 +184,7 @@ def parse_email(mail, uid):
     if attachments == '':
         attachments = 'None'
 
-    return result, sender, subject, payload, attachments
+    return result, sender, subject, payload, attachments, filenames
 
 
 def fetch_email(account):
@@ -200,22 +207,21 @@ def fetch_email(account):
         # Parse each message in the folder
         uid_list = uids[0].split()
         for uid in uid_list:
-            result, sender, subject, payload, attachments = parse_email(mail, uid)
+            result, sender, subject, payload, attachments, filenames = parse_email(mail, uid)
             if result != 'OK':
                 bot.sendMessage(my_id, 'Error while searching ' + folder + ' of ' + account.username + ': ' + result)
                 return
 
-            # Messages to send if there are emails
-            msg.insert(0, '<b>You\'ve got a new e-mail!</b>\n<pre>From: {}\nTo: {}\nSubject: {}\nAttachments: {}\n</pre>\n{}'.format(sender, account.username, subject, attachments, payload))
-
             # Keyboard
-            # TODO: implement this
             if (attachments != 'None'):
-                keyboard = InilenKeyboardMarkup(inline_keyboard=[
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text='Download Attachments', callback_data='da:{}:{}:{}'.format(account.username, folder, uid))]
                 ])
             else:
                 keyboard = None
+
+            # Messages to send if there are emails
+            msg.insert(0, ['<b>You\'ve got a new e-mail!</b>\n<pre>From: {}\nTo: {}\nSubject: {}\nAttachments: {}\n</pre>\n{}'.format(sender, account.username, subject, attachments, payload), keyboard, filenames])
 
     # Close the connection and logout
     mail.close()
@@ -226,18 +232,23 @@ def fetch_email(account):
 
 for account in accounts:
     msg = fetch_email(account)
-    i = 0
     for mex in msg:
+        text = mex[0]
+        keyboard = mex[1]
+        filenames = mex[2]
         try:
-            bot.sendMessage(my_id, mex, 'HTML')
+            bot.sendMessage(my_id, text, 'HTML')
         except telepot.exception.TelegramError as err:
             if (err.description == 'Bad Request: message is too long'):
                 # Split the long message in chunks (max lenght for the
                 # API is 4096 bytes)
-                chunks = [mex[i:i+4000] for i in range(0, len(mex), 4000)] # I brutally copied this line from http://stackoverflow.com/questions/9475241/split-python-string-every-nth-character
+                chunks = [text[i:i+4000] for i in range(0, len(text), 4000)] # I brutally copied this line from http://stackoverflow.com/questions/9475241/split-python-string-every-nth-character
                 for chunk in chunks:
                     bot.sendMessage(my_id, chunk, 'HTML')
             else:
                 bot.sendMessage(my_id, 'You\'ve got new mails to {}, but I could\'t send them because of a Telegram error: {}'.format(account.username, err))
 
-        i = i+1
+        for filename in filenames:
+            with open('/home/fmarotta/raspbotpi/attachments/{}'.format(filename), 'rb') as attachment:
+                bot.sendDocument(my_id, attachment, caption = filename)
+            os.remove('/home/fmarotta/raspbotpi/attachments/{}'.format(filename))
