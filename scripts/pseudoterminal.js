@@ -10,24 +10,51 @@
 // you can uninstall at least python2). It also requires the node module nan. Last time I did this:
 // 1) As root (not sudo) npm install node-pty (without -g)
 // 2) Move the modules in /usr/lib/node_modules
-const Telegraf = require('/usr/lib/node_modules/telegraf')
+const Telegraf = require('../lib/node_modules/telegraf')
 const Pty = require('/usr/lib/node_modules/node-pty')
 const Fs = require('fs')
 const Https = require('https')
+const Winston = require('../lib/node_modules/winston')
 
 // Check if the number of arguments is right
+/* Deprecated since we read the param file
 if (process.argv.length != 4) {
     console.log('Pass me the bot\'s token and your Telegram ID as arguments')
     process.exit()
 }
+*/
+
+// Read the config file
+const basedir = '/home/fmarotta/raspbotpi/'
+const paramsfile = basedir + 'config/params'
+const params = Fs.readFileSync(paramsfile).toString().replace(/\n$/, '').split(/\t/)
 
 // Start the bot
-const token = process.argv[2]
-const my_id = parseInt(process.argv[3])
+const token = params[0]
+const my_id = parseInt(params[1])
 const bot = new Telegraf(token)
 
 // Set the home variable
 const home = '/home/fmarotta/'
+
+// Configure logging with winston
+const logger = Winston.createLogger({
+    exitOnError: true,
+    transports: [
+        new Winston.transports.File({
+            filename: basedir + 'log/raspbotpi.log',
+            level: 'info',
+            format: Winston.format.combine(
+                Winston.format.timestamp(),
+                Winston.format.json()
+            )
+        }),
+        new Winston.transports.Console({
+            level: 'debug',
+            format: Winston.format.simple()
+        })
+    ]
+})
 
 // Initialize the pty variable to take a track of wether a command is
 // running or not
@@ -50,7 +77,7 @@ bot.on(['message', 'edited_message', 'inline_query', 'channel_post', 'edited_cha
 
         // And a message to the bot's master
         ctx.telegram.sendMessage(my_id, 'Bot violation\n' + 
-            'User "' + username + '" ' +
+            'User @"' + username + '" ' +
             '(' + id + ')\n' +
             'Wrote "' + text + '"'
         )
