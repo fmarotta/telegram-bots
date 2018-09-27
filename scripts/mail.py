@@ -21,6 +21,7 @@ from email.header import decode_header
 
 sys.path.insert(0, "/home/fmarotta/raspbotpi/lib/python3.7")
 import telepot
+from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
 from bs4 import BeautifulSoup # Install package ``beautifulsoup4'' via pip.
 
 #if len(sys.argv) != 3:
@@ -71,128 +72,161 @@ with open('/home/fmarotta/raspbotpi/config/mail_accounts') as mail_accounts:
         imap_params = imap_params.rstrip("\n")
         accounts.append(ImapAccount(imap_params.split("\t")))
 
-# The function which fetches the messages
-def fetch_email(account):
-    msg = []
+
+def search_email(mail, folder):
+    # Select the specified folder
+    result, n_mails = mail.select(folder)
+    if result != 'OK':
+        return result
+
+    result, uids = mail.uid('search', None, '(UNSEEN)')
+    if result != 'OK':
+        return result
+
+    return 'OK', uids
+
+
+def imap_connect(account):
     # Create a ssl context for the connection to the imap server
     try:
         context = ssl.create_default_context()
     except ssl.SSLError as err:
-        print(err);
+        return 1, err
 
     # Connect to the server
     try:
         mail = imaplib.IMAP4_SSL(host=account.host, port=account.port, ssl_context=context)
     except IMAP4.error as err:
-        print('error while connecting to the server for {}.\nError: {}'.format(account, err));
-        return
+        return 1, err
 
     # Login to the specified account
     result, address = mail.login(account.username, account.password)
     if result != 'OK':
-        bot.sendMessage(my_id, 'Error while logging in to ' + account.username + ': ' + result)
-        return
+        return 1, result
+
+    return 'OK', mail
+
+
+def parse_email(mail, uid):
+    sender = ''
+    subject = ''
+    payload = ''
+    attachments = ''
+
+    # Fetch unread emails
+    result, data = mail.uid('fetch', uid, '(RFC822)') # By fetching the message following RFC 822, it becomes automatically read
+    if result != 'OK':
+        return result
+
+    # Parse the message
+    message = email.message_from_string(data[0][1].decode(encoding='utf-8', errors='ignore'))
+
+    # Save some header information Feature: recognize replies and Cc
+    temp_sender = decode_header(message['from'])
+    sender = email.utils.parseaddr(str(temp_sender[0][0]))[0]
+    # Sometimes email.utils doesn't work well...
+    if sender == '':
+        sender = temp_sender[0][0]
+    # Not all message headers are encoded as bytes
+    try:
+        sender = sender.decode('utf-8')
+        # NOTE: do not try to print sender or subject on the console, or
+        # it will rise an error, although the message on Telegram is
+        # good
+    except AttributeError:
+        pass
+
+    subject = decode_header(message['subject'])
+    subject = subject[0][0]
+    # Not all message headers are encoded as bytes
+    try:
+        subject = subject.decode('utf-8')
+    except AttributeError:
+        pass
+
+    # Decode and save only the plain text body NOTE: we do not use the
+    # method get_body; we use walk instead, because we think it is safer
+    if not message.is_multipart():
+        charset = message.get_content_charset()
+        payload = message.get_payload(decode=True).decode(encoding = charset, errors = 'ignore')
+    else:
+        for part in message.walk():
+            charset = part.get_content_charset()
+            if part.get_content_type() == 'text/plain':
+                payload += part.get_payload(decode=True).decode(encoding = charset, errors = 'ignore') + '\n'
+            # If there is an attachment, inform the user
+            if not part.get_content_maintype() in ['text', 'multipart', 'message']:
+                attachments += part.get_content_type() + '\n'
+
+    # Inform the user if there is no textual payload
+    if payload == '':
+        payload = 'No textual payload'
+
+    # Parse the body for any eventual HTML and return only the text
+    soup = BeautifulSoup(payload, 'html5lib')
+    payload = soup.get_text()
+
+    # Replace `<' and `>' characters, because they confuse the Telegram
+    #         API The replacement characters are, respectively, the
+    #         less-than-or-equal-to and the greater-than-or-equal-to
+    #         signs
+    payload = payload.replace('<', '≤')
+    payload = payload.replace('>', '≥')
+
+    # Instead of letting this field blank, tell 'None'
+    if attachments == '':
+        attachments = 'None'
+
+    return result, sender, subject, payload, attachments
+
+
+def fetch_email(account):
+    msg = []
+
+    result, mail = imap_connect(account)
+    if result != 'OK':
+        bot.sendMessage(my_id, 'Error while connecting to {}: {}'.format(account.username, mail))
 
     # Select the folders to search for messages
     for folder in account.folders:
-        # Select the specified folder
-        result, n_mails = mail.select(folder)
+        result, uids = search_email(mail, folder)
         if result != 'OK':
-            bot.sendMessage(my_id, 'Error while selecting ' + folder + ' from ' + account.username + ': ' + result)
-            return
-
-        # Search for unread emails
-        result, uids = mail.uid('search', None, '(UNSEEN)')
-        if result != 'OK':
-            bot.sendMessage(my_id, 'Error while searching new e-mails in ' + account.username + ': ' + result)
+            bot.sendMessage(my_id, 'Error while searching ' + folder + ' of ' + account.username + ': ' + result)
             return
         if uids[0] == '':
             # There is nothing to read here
             continue
 
+        # Parse each message in the folder
         uid_list = uids[0].split()
         for uid in uid_list:
-            # Variables definition
-            payload = ''
-            attachments = ''
-            # Fetch the unread emails
-            result, data = mail.uid('fetch', uid, '(RFC822)') # By fetching the message following RFC 822, it becomes automatically read
+            result, sender, subject, payload, attachments = parse_email(mail, uid)
             if result != 'OK':
-                bot.sendMessage(my_id, 'Error while fetching new e-mails from ' + account.username + '\n: ' + result)
+                bot.sendMessage(my_id, 'Error while searching ' + folder + ' of ' + account.username + ': ' + result)
                 return
-
-            # Parse the message
-            message = email.message_from_string(data[0][1].decode(encoding='utf-8', errors='ignore'))
-
-            # Save some header information
-            # Feature: recognize replies and Cc
-            temp_sender = decode_header(message['from'])
-            sender = email.utils.parseaddr(str(temp_sender[0][0]))[0]
-            # Sometimes email.utils doesn't work well...
-            if sender == '':
-                sender = temp_sender[0][0]
-                # Not all message headers are encoded as bytes
-                try:
-                    sender = sender.decode('utf-8')
-                    # NOTE: do not try to print sender or subject
-                    # on the console, or it will rise an error,
-                    # although the message on Telegram is good
-                except AttributeError:
-                    pass
-                    
-            subject = decode_header(message['subject'])
-            subject = subject[0][0]
-            # Not all message headers are encoded as bytes
-            try:
-                subject = subject.decode('utf-8')
-            except AttributeError:
-                pass
-
-            # Decode and save only the plain text body
-            # NOTE: we do not use the method get_body; we use
-            # walk instead, because we think it is safer
-            if not message.is_multipart():
-                charset = message.get_content_charset()
-                payload = message.get_payload(decode=True).decode(encoding = charset, errors = 'ignore')
-            else:
-                for part in message.walk():
-                    charset = part.get_content_charset()
-                    if part.get_content_type() == 'text/plain':
-                        payload += part.get_payload(decode=True).decode(encoding = charset, errors = 'ignore') + '\n'
-                    # If there is an attachment, inform the user
-                    if not part.get_content_maintype() in ['text', 'multipart', 'message']:
-                        attachments += part.get_content_type() + '\n'
-
-            # Inform the user if there is no textual payload
-            if payload == '':
-                payload = 'No textual payload'
-
-            # Parse the body for any eventual HTML and return only the text
-            soup = BeautifulSoup(payload, 'html5lib')
-            payload = soup.get_text()
-
-            # Replace `<' and `>' characters, because they confuse the
-            # Telegram API
-            # The replacement characters are, respectively, the
-            # less-than-or-equal-to and the greater-than-or-equal-to signs
-            payload = payload.replace('<', '≤')
-            payload = payload.replace('>', '≥')
-
-            # Instead of letting this field blank, tell 'None'
-            if attachments == '':
-                attachments = 'None'
 
             # Messages to send if there are emails
             msg.insert(0, '<b>You\'ve got a new e-mail!</b>\n<pre>From: {}\nTo: {}\nSubject: {}\nAttachments: {}\n</pre>\n{}'.format(sender, account.username, subject, attachments, payload))
+
+            # Keyboard
+            # TODO: implement this
+            if (attachments != 'None'):
+                keyboard = InilenKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text='Download Attachments', callback_data='da:{}:{}:{}'.format(account.username, folder, uid))]
+                ])
+            else:
+                keyboard = None
 
     # Close the connection and logout
     mail.close()
     mail.logout()
 
-    return msg
+    return list(reversed(msg))
+
 
 for account in accounts:
     msg = fetch_email(account)
+    i = 0
     for mex in msg:
         try:
             bot.sendMessage(my_id, mex, 'HTML')
@@ -205,3 +239,5 @@ for account in accounts:
                     bot.sendMessage(my_id, chunk, 'HTML')
             else:
                 bot.sendMessage(my_id, 'You\'ve got new mails to {}, but I could\'t send them because of a Telegram error: {}'.format(account.username, err))
+
+        i = i+1
