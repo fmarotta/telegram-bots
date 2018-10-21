@@ -85,7 +85,7 @@ bot.on(['message', 'edited_message', 'inline_query', 'channel_post', 'edited_cha
         return
 
     }
-        
+ 
     // Call next middleware
     next()
 
@@ -122,7 +122,7 @@ bot.command('kill', (ctx, next) => {
             ctx.reply('Send a valid signal')
 
         }
-            
+
     }
 
     try {
@@ -219,6 +219,37 @@ bot.on('text', (ctx, next) => {
     // Define some useful variables for siplicity's sake
     text = ctx.message.text
 
+	// Detect if message is a reply
+	if (ctx.message.reply_to_message) {
+		var orig_text = ctx.message.reply_to_message.text
+		var lines = orig_text.match(/[^\r\n]+/g);
+
+		var delivered = lines[1].replace("Delivered to: ", "")
+		var from = getAddr(lines[2].replace("From: ", ""))[0]
+		var tos = getAddr(lines[3].replace("To: ", ""))
+		var ccs = getAddr(lines[4].replace("Cc: ", ""))
+		if (ccs == "Nobody")
+			ccs = []
+		var subject = lines[5].replace("Subject: ", "")
+		var message_id = lines[6].replace("ID: ≤", "").replace("≥", "")
+		var body = ctx.message.text
+
+		var receipients = tos.concat(ccs)
+		//var unique_receipients = receipients.concat(cc).filter(function(item, pos, self) {
+			//return self.indexOf(item) == pos;
+		//})
+
+		// make array for header
+		var mail = {delivered_to: delivered,
+			from: from,
+			receipients: receipients, 
+			subject: subject,
+			message_id: message_id,
+			body: body}
+
+		text = 'python /home/fmarotta/raspbotpi/scripts/mail.py \'' + JSON.stringify(mail) + '\''
+	}
+
     // Execute the command received
     // if another command is not already running
     if (!pty) {
@@ -244,7 +275,7 @@ bot.on('text', (ctx, next) => {
             }catch (err) {
 
                 ctx.reply("Unable to change directory: " + err)
-            
+
                 return
 
             }
@@ -286,7 +317,7 @@ bot.on('text', (ctx, next) => {
             cwd: process.cwd() || home, // process.cwd() is better because then you can use relative paths
             env: getEnv(),
         })
-    
+
         // Process the output
         // FIXME: sometimes messages are fragmented and sent in the wrong order.
         // Maybe add some kind of buffer? However, for interactive commands that
@@ -300,7 +331,7 @@ bot.on('text', (ctx, next) => {
 
         // Process the exit code
         pty.on('exit', function(code, signal) {
-    
+
             pty = 0
 
             if (!signal && !code) {
@@ -324,14 +355,14 @@ bot.on('text', (ctx, next) => {
         })
 
     }else {
-    
+
         // Send data to the pty
         pty.write(text)
 
     }
 
     return
-    
+
 }) 
 
 
@@ -353,27 +384,43 @@ function getEnv() {
     // server from inside tmux.
     delete env.TMUX
     delete env.TMUX_PANE
-  
+
     // Make sure we didn't start
     // our server from inside screen.
     // http://web.mit.edu/gnu/doc/html/screen_20.html
     delete env.STY
     delete env.WINDOW
-  
+
     // Delete some variables that
     // might confuse our terminal.
     delete env.WINDOWID
     delete env.TERMCAP
     delete env.COLUMNS
     delete env.LINES
-  
+
     // Set $TERM to screen. This disables multiplexers
     // that have login hooks, such as byobu.
     env.TERM = "screen"
 
     // Set the home directory.
     env.HOME = home
-  
+
     return env
 
+}
+
+function getAddr(text) {
+	if (text == '')
+		return ''
+	
+	fields = text.split(',')
+	addr = []
+	fields.forEach(function (item, index) {
+		fields[index] = item.replace(/.*≤(.*)≥/, function (str, group) {
+			return group
+		})
+		fields[index] = fields[index].trim()
+	})
+
+	return fields
 }
