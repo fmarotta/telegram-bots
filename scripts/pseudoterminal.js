@@ -366,8 +366,24 @@ bot.on('text', (ctx, next) => {
 }) 
 
 
-// Start listening to messages
-bot.startPolling()
+// Start listening to messages, afted deleting any message still in the 
+// queue
+// https://github.com/telegraf/telegraf/issues/454
+async function clearOldMessages(tgBot) {
+        // Get updates for the bot
+        const updates = await tgBot.telegram.getUpdates(0, 100, -1);
+
+        //  Add 1 to the ID of the last one, if there is one
+        return updates.length > 0
+                ? updates[updates.length-1].update_id + 1
+                : 0
+        ;
+}
+async function setup(bot) {
+	bot.polling.offset = await clearOldMessages(bot)
+	bot.startPolling()
+}
+setup(bot)
 
 
 // Functions

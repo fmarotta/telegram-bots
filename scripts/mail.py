@@ -183,11 +183,18 @@ def parse_email(mail, uid):
     except TypeError:
         message_id = message['message-id']
     try:
-        subject = decode_header(message['subject'])[0][0].decode('utf-8').replace('<', '≤').replace('>', '≥')
+        subject = decode_header(message['subject'])[0][0]
+        try:
+            subject = subject.decode('utf-8')
+        except AttributeError:
+            pass
+        subject = subject.replace('<', '≤').replace('>', '≥')
     except TypeError:
         subject = message['subject']
 
     # Not all message headers are encoded as bytes
+    # WARNING: I think this does not work. The decoding should be done 
+    # before the replacement of > and <. The subject works correctly.
     try:
         sender = sender.decode('utf-8')
         # NOTE: do not try to print sender or subject on the console, or
