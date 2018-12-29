@@ -12,7 +12,6 @@ and sends the plain text parts to a Telegram user through a bot.
 # In order for the bot to work properly, you should install telepot 7.0 with
 # `pip install telepot==7.0`
 
-import ssl
 import imaplib
 import smtplib
 import email
@@ -20,8 +19,10 @@ from email.header import decode_header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import json
-import sys
 import os
+import re
+import sys
+import ssl
 import time
 
 sys.path.insert(0, "/home/fmarotta/raspbotpi/lib/python3.7")
@@ -161,25 +162,30 @@ def parse_email(mail, uid):
     message = email.message_from_string(data[0][1].decode(encoding='utf-8', errors='ignore'))
 
     # Save some header information
-    sender = decode_header(message['from'])[0][0].replace('<', 
-            '≤').replace('>', '≥')
-    receipient = decode_header(message['to'])[0][0].replace('<', 
-            '≤').replace('>', '≥').replace('\n', ' ')
+    try:
+        sender = decode_header(message['from'])[0][0].replace('<', 
+                '≤').replace('>', '≥')
+    except TypeError:
+        sender = message['from']
+    try:
+        receipient = decode_header(message['to'])[0][0].replace('<', 
+                '≤').replace('>', '≥').replace('\n', ' ')
+    except TypeError:
+        receipient = message['to']
     try:
         cc = decode_header(message['cc'])[0][0].replace('<', 
                 '≤').replace('>', '≥').replace('\n', ' ')
     except TypeError:
         cc = 'Nobody'
-    subject = decode_header(message['subject'])[0][0].replace('<', 
-            '≤').replace('>', '≥')
-    message_id = decode_header(message['message-id'])[0][0].replace('<', 
-            '≤').replace('>', '≥')
-
-    #temp_sender = decode_header(message['from'])
-    #sender = email.utils.parseaddr(str(temp_sender[0][0]))[0]
-    # Sometimes email.utils doesn't work well...
-    #if sender == '':
-        #sender = temp_sender[0][0]
+    try:
+        message_id = decode_header(message['message-id'])[0][0].replace('<', 
+                '≤').replace('>', '≥')
+    except TypeError:
+        message_id = message['message-id']
+    try:
+        subject = decode_header(message['subject'])[0][0].decode('utf-8').replace('<', '≤').replace('>', '≥')
+    except TypeError:
+        subject = message['subject']
 
     # Not all message headers are encoded as bytes
     try:
@@ -200,10 +206,12 @@ def parse_email(mail, uid):
     except AttributeError:
         pass
 
+    """
     try:
         subject = subject.decode('utf-8')
     except AttributeError:
         pass
+    """
 
     # Decode and save only the plain text body NOTE: we do not use the
     # method get_body; we use walk instead, because we think it is safer
@@ -231,13 +239,24 @@ def parse_email(mail, uid):
 
     # Parse the body for any eventual HTML and return only the text
     soup = BeautifulSoup(payload, 'html5lib')
+    for style in soup(["script", "style"]):
+        style.extract()
+    for a in soup.findAll('a'):
+        if a.string != None and a['href'] != None:
+            a.string = a.string + " (" + a['href'] + ")"
     payload = soup.get_text()
+    lines = (line.strip() for line in payload.splitlines()) # remove trailing whitespace
+    chunks = (phrase.strip() for line in lines for phrase in line.split("  ")) # handle continuations
+    payload = '\n'.join(chunk for chunk in chunks) # put everything back together
+    payload = payload.strip()
+    payload = re.sub(r'\n\n+', '\n\n', payload) # remove too many empty lines
 
     # Replace `<' and `>' characters, because they confuse the Telegram
     # API The replacement characters are, respectively, the
     # less-than-or-equal-to and the greater-than-or-equal-to signs
     payload = payload.replace('<', '≤')
     payload = payload.replace('>', '≥')
+    payload = payload.replace('*', '★')
 
     # Instead of letting this field blank, tell 'None'
     if attachments == '':
@@ -305,14 +324,14 @@ if len(sys.argv) == 1:
             keyboard = mex[1]
             filenames = mex[2]
             try:
-                bot.sendMessage(my_id, text, 'HTML')
+                bot.sendMessage(my_id, text, 'HTML', disable_web_page_preview=True)
             except telepot.exception.TelegramError as err:
                 if (err.description == 'Bad Request: message is too long'):
                     # Split the long message in chunks (max lenght for 
                     # the API is 4096 bytes)
                     chunks = [text[i:i+4000] for i in range(0, len(text), 4000)] # I brutally copied this line from http://stackoverflow.com/questions/9475241/split-python-string-every-nth-character
                     for chunk in chunks:
-                        bot.sendMessage(my_id, chunk, 'HTML')
+                        bot.sendMessage(my_id, chunk, 'HTML', disable_web_page_preview=True)
                 else:
                     bot.sendMessage(my_id, 'You\'ve got new mails to {}, but I could\'t send them because of a Telegram error: {}'.format(account.username, err))
 
@@ -325,6 +344,9 @@ elif len(sys.argv) == 2:
     mail_string = json.loads(sys.argv[1])
     mail_string["body"] += "\n\nSent from raspi."
 
+    text_plain = mail_string["body"]
+    text_html = mail_string["body"].replace("\n", "<br>");
+
     msg = MIMEMultipart("mixed")
     msg["from"] = mail_string["delivered_to"]
     msg["to"] = mail_string["from"]
@@ -334,9 +356,8 @@ elif len(sys.argv) == 2:
     msg["references"] = mail_string["message_id"]
     msg["message-ID"] = email.utils.make_msgid()
     body = MIMEMultipart("alternative")
-    body.attach(MIMEText(mail_string["body"], "plain"))
-    body.attach(MIMEText("<html>"+mail_string["body"]+"</html>", 
-        "html"))
+    body.attach(MIMEText(text_plain, "plain"))
+    body.attach(MIMEText("<html>"+text_html+"</html>", "html"))
     msg.attach(body)
 
     # TODO: error checking if the email is not sent
