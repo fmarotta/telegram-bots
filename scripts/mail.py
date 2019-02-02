@@ -166,7 +166,8 @@ def parse_email(mail, uid):
         sender = decode_header(message['from'])[0][0].replace('<', 
                 '≤').replace('>', '≥')
     except TypeError:
-        sender = message['from']
+        sender = message['from'].replace('<',
+                '≤').replace('>', '≥')
     try:
         receipient = decode_header(message['to'])[0][0].replace('<', 
                 '≤').replace('>', '≥').replace('\n', ' ')
