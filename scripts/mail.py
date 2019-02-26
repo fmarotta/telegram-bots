@@ -229,7 +229,7 @@ def parse_email(mail, uid):
     else:
         for part in message.walk():
             charset = part.get_content_charset()
-            if part.get_content_type() == 'text/plain':
+            if part.get_content_type() == 'text/html':
                 payload += part.get_payload(decode=True).decode(encoding = charset, errors = 'ignore') + '\n'
             # If there is an attachment, inform the user
             if not part.get_content_maintype() in ['text', 'multipart', 'message']:
