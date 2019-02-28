@@ -225,6 +225,8 @@ def parse_email(mail, uid):
     # method get_body; we use walk instead, because we think it is safer
     if not message.is_multipart():
         charset = message.get_content_charset()
+        if charset is None:
+            charset = "utf-8"
         payload = message.get_payload(decode=True).decode(encoding = charset, errors = 'ignore')
     else:
         for part in message.walk():
