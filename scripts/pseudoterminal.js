@@ -127,7 +127,14 @@ bot.command('kill', (ctx, next) => {
 
     try {
 
-        process.kill(pid, signal)
+		var sys = require('sys')
+		var chp = require('child_process').exec;
+
+		function puts(error, stdout, stderr) { sys.puts(stdout) }
+
+		chp("sudo kill " + pid, puts);
+
+		// process.kill(pid, signal)
 
     }catch (err) {
 
